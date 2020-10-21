@@ -1,4 +1,5 @@
 import os
+import pickle
 from flask import Flask, render_template, request, abort
 from werkzeug.utils import secure_filename
 import pandas as pd
@@ -8,6 +9,13 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024
 app.config['UPLOAD_EXTENSIONS'] = ['.csv']
 app.config['UPLOAD_PATH'] = 'tmp'
+model_rms = pickle.load(open('lof_rms_trained_model.pkl', 'rb'))
+
+def Anomaly_output(x):
+    if x==1:
+        return "Normal"
+    else:
+        return "Anomaly"
 
 @app.route('/')
 def index():
@@ -24,13 +32,17 @@ def upload_files():
     	uploaded_file.save(os.path.join(app.config['UPLOAD_PATH'], 'data.csv'))
     
     
-    # Load and Combine the Dataset
+    # Load the data
     data_dir = 'tmp/'
     file_name = 'data.csv'
     df = pd.read_csv(os.path.join(data_dir, file_name), sep='\t')
     df_b1 = df.iloc[:,0].values
-    df_b1_mean = np.mean(np.absolute(df_b1))  
-    return str(df_b1_mean)
+    
+    # Calculate rms value & Predict Anomaly
+    df_b1_rms = np.sqrt((np.sum(df_b1**2))/len(df_b1)) 
+    op = model_rms.predict(df_b1_rms.reshape(-1,1))
+    Aop = Anomaly_output(op)
+    return Aop
 
 if __name__ == '__main__':
     app.run(port=5000,debug=True)
